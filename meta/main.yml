@@ -1,0 +1,11 @@
+---
+# Ansible meta
+#
+# wikijs role dependencies
+
+dependencies:
+  - role: mariadb
+    tags:
+      - mariadb
+
+...

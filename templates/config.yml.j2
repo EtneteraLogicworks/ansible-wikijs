@@ -1,0 +1,34 @@
+# Wiki.js - CONFIGURATION
+# Based on https://github.com/Requarks/wiki/blob/dev/config.sample.yml
+
+port: {{ wikijs.port }}
+
+db:
+  type: mariadb
+
+  # PostgreSQL / MySQL / MariaDB / MS SQL Server only:
+  host: localhost
+  port: 3306
+  user: {{ wikijs.database.user }}
+  pass: {{ wikijs.database.password }}
+  db: {{ wikijs.database.name }}
+  ssl: false
+  sslOptions:
+    auto: true
+
+ssl:
+  enabled: false
+
+pool:
+  # min: 2
+  # max: 10
+
+bindIP: 0.0.0.0
+
+logLevel: info
+
+offline: {{ wikijs.offline | icinga }}
+
+ha: false
+
+dataPath: ./data

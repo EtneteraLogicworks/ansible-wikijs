@@ -1,0 +1,141 @@
+---
+# Ansible role
+#
+# Deploy Wiki.js
+
+- name: Install dependencies
+  apt:
+    name:
+      - 'nodejs'
+      - 'pandoc'
+
+- name: Create wikijs group
+  group:
+    name: '{{ wikijs.group }}'
+    system: yes
+
+- name: Create wikijs user
+  user:
+    name: '{{ wikijs.user }}'
+    system: yes
+    group: '{{ wikijs.group }}'
+    groups: '{{ wikijs.groups | default(omit) }}'
+    shell: '/bin/nologin'
+    home: '/var/empty'
+
+- name: Create wikijs directory
+  file:
+    path: '{{ wikijs.install_dir }}'
+    owner: 'root'
+    group: '{{ wikijs.group }}'
+    state: directory
+    mode: '0750'
+
+- name: Create wikijs database
+  block:
+    - name: Create database
+      mysql_db:
+        name: '{{ wikijs.database.name }}'
+
+    - name: Create database user
+      mysql_user:
+        name: '{{  wikijs.database.user }}'
+        password: '{{ wikijs.database.password }}'
+        host: 'localhost'
+        priv: '{{ wikijs.database.name }}.*:ALL'
+
+  # role je zamyslena nasazovat na replikovany databazovy server
+  # o propagaci na druhy stroj se postara replikace
+  when: failover_role != 'backup'
+  tags:
+    - wikijs-database
+
+
+- name: Install Wiki.js
+  block:
+    - name: Download Wiki.js
+      environment: '{{ proxy_env | default({}) }}'
+      get_url:
+        url: 'https://github.com/Requarks/wiki/releases/download/{{ wikijs.version }}/wiki-js.tar.gz'
+        dest: '/tmp/wikijs-{{ wikijs.version }}.tag.gz'
+
+    - name: Install Wiki.js
+      unarchive:
+        src: '/tmp/wikijs-{{ wikijs.version }}.tag.gz'
+        remote_src: true
+        dest: '{{ wikijs.install_dir }}'
+      notify:
+       - restart wikijs
+
+    - name: Install sideload repo
+      environment: '{{ proxy_env | default({}) }}'
+      git:
+        repo: 'https://github.com/Requarks/wiki-localization'
+        dest: '{{ wikijs.install_dir  }}/data/sideload'
+      when: wikijs.offline
+      notify:
+       - restart wikijs
+
+    - name: Set ownership of all files
+      file:
+        path: '{{ wikijs.install_dir  }}'
+        owner: 'root'
+        group: '{{ wikijs.group }}'
+        mode: 'g+r'
+        state: directory
+        recurse: true
+
+    - name: Set writable access
+      file:
+        path: '{{ wikijs.install_dir  }}/data'
+        owner: '{{ wikijs.user }}'
+        group: '{{ wikijs.group }}'
+        state: directory
+        recurse: true
+
+    - name: Create assets dir
+      file:
+        path: '{{ wikijs.assets_dir }}'
+        owner: '{{ wikijs.user }}'
+        group: '{{ wikijs.group }}'
+        state: directory
+        recurse: true
+      when: wikijs.assets_dir is defined
+
+  when: update | default(false) | bool
+  tags:
+    - wikijs-deploy
+
+
+- name: Configure Wiki.js
+  template:
+    dest: '{{ wikijs.install_dir  }}/config.yml'
+    src: 'config.yml.j2'
+    owner: 'root'
+    group: '{{ wikijs.group }}'
+    mode: '0640'
+  notify:
+   - restart wikijs
+  tags:
+    - wikijs-config
+
+
+- name: Create systemd wikijs service
+  block:
+    - name: Generate sytemd service file
+      template:
+        src: 'wikijs.service.j2'
+        dest: '/etc/systemd/system/wikijs.service'
+        mode: '0644'
+
+    - name: Start sytemd service
+      systemd:
+        daemon_reload: true
+        name: 'wikijs.service'
+        state: started
+        enabled: true
+
+  tags:
+    - wikijs-systemd
+
+...

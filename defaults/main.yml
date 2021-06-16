@@ -1,0 +1,16 @@
+---
+# Ansible vars
+#
+# Default variables for wikijs role
+
+wikijs:
+  user: 'wikijs'
+  group: 'wikijs'
+  install_dir: '/srv/www/wikijs'
+  port: 3465
+  offline: 'false'
+  database:
+    name: 'wikijs'
+    user: 'wikijs'
+
+...

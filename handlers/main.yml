@@ -1,0 +1,10 @@
+---
+# Ansible handlers
+#
+
+- name: restart wikijs
+  service:
+    name: wikijs
+    state: restarted
+
+...
